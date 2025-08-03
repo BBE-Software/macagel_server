@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -12,34 +13,68 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/user-roles.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { RolesGuard } from 'src/common/guards/user-roles.guard';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 import { UserRoleService } from './user-role.service';
 
-@Controller('roles')
+@Controller('user-roles')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UserRoleController {
   constructor(private readonly userRoleService: UserRoleService) {}
 
   @Get()
+  @HttpCode(200)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  findAll() {
-    return this.userRoleService.getAll();
+  async getAll() {
+    const userRoles = await this.userRoleService.getAll();
+    return {
+      status: 'success',
+      data: userRoles,
+    };
+  }
+
+  @Get(':name')
+  @HttpCode(200)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  async getOne(@Param('name') name: string) {
+    const role = await this.userRoleService.getOne(name);
+    return {
+      status: 'success',
+      data: role,
+    };
   }
 
   @Post()
+  @HttpCode(201)
   @Roles(Role.SUPER_ADMIN)
-  create(@Body() body: { id: string }) {
-    return this.userRoleService.create(body.id);
+  async create(@Body() dto: CreateRoleDto) {
+    const newRole = await this.userRoleService.create(dto);
+    return {
+      status: 'success',
+      data: newRole,
+    };
   }
 
-  @Patch(':id')
+  @Patch(':name')
+  @HttpCode(200)
   @Roles(Role.SUPER_ADMIN)
-  update(@Param('id') id: string, @Body() body: { id?: string }) {
-    return this.userRoleService.update(id, body.id);
+  async update(@Param('name') name: string, @Body() dto: UpdateRoleDto) {
+    const oldData = await this.userRoleService.getOne(name);
+    const newData = await this.userRoleService.update(name, dto);
+
+    return {
+      status: 'success',
+      data: {
+        oldData,
+        newData,
+      },
+    };
   }
 
-  @Delete(':id')
+  @Delete(':name')
+  @HttpCode(204)
   @Roles(Role.SUPER_ADMIN)
-  remove(@Param('id') id: string) {
-    return this.userRoleService.remove(id);
+  async delete(@Param('name') name: string) {
+    await this.userRoleService.delete(name);
   }
 }
