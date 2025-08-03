@@ -15,11 +15,47 @@ datasource db {
 }
 
 // user_roles
-model RoleDefinition {
+model UserRoles {
   id          Int    @id @default(autoincrement())
   name        String @unique
   label       String
   description String
+  User        User[]
 
   @@map("user_roles")
+}
+
+// sports
+model Sport {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  @@map("sports")
+}
+
+// users
+model User {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String   @db.VarChar(32)
+  surname           String   @db.VarChar(32)
+  nickname          String   @unique @db.VarChar(16)
+  birthday          DateTime
+  height            Int?     @db.SmallInt
+  weight            Int?     @db.SmallInt
+  gender            String   @db.VarChar(16)
+  show_gender       Boolean  @default(true)
+  show_height       Boolean  @default(true)
+  show_weight       Boolean  @default(true)
+  country_code      String   @db.Char(2)
+  is_private        Boolean  @default(false)
+  is_active         Boolean  @default(true)
+  current_latitude  Float?   @db.Real
+  current_longitude Float?   @db.Real
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  role_name String
+  role      UserRoles @relation(fields: [role_name], references: [name])
+
+  @@map("users")
 }

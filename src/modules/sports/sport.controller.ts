@@ -13,60 +13,60 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/user-roles.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { RolesGuard } from 'src/common/guards/user-roles.guard';
-import { CreateRoleDto } from './dto/create-role.dto';
-import { UpdateRoleDto } from './dto/update-role.dto';
-import { UserRoleService } from './user-role.service';
+import { CreateSportDto } from './dto/create-sport.dto';
+import { UpdateSportDto } from './dto/update-sport.dto';
+import { SportService } from './sport.service';
 
-@Controller('user-roles')
+@Controller('sports')
 @UseGuards(JwtAuthGuard, RolesGuard)
-export class UserRoleController {
-  constructor(private readonly userRoleService: UserRoleService) {}
+export class SportsController {
+  constructor(private readonly sportService: SportService) {}
 
   @Get()
   @HttpCode(200)
   async getAll() {
-    const roles = await this.userRoleService.getAll();
+    const sports = await this.sportService.getAll();
 
     // TODO: Error Exception
 
     return {
       status: 'success',
-      data: roles,
+      data: sports,
     };
   }
 
   @Get(':name')
   @HttpCode(200)
   async getOne(@Param('name') name: string) {
-    const role = await this.userRoleService.getOne(name);
+    const sport = await this.sportService.getOne(name);
 
     // TODO: Error Exception
 
     return {
       status: 'success',
-      data: role,
+      data: sport,
     };
   }
 
   @Post()
   @HttpCode(201)
   @Roles(Role.SUPER_ADMIN)
-  async create(@Body() dto: CreateRoleDto) {
-    const role = await this.userRoleService.create(dto);
+  async create(@Body() dto: CreateSportDto) {
+    const sport = await this.sportService.create(dto);
 
     // TODO: Error Exception
 
     return {
       status: 'success',
-      data: role,
+      data: sport,
     };
   }
 
   @Patch(':name')
   @HttpCode(200)
   @Roles(Role.SUPER_ADMIN)
-  async update(@Param('name') name: string, @Body() dto: UpdateRoleDto) {
-    const { oldData, newData } = await this.userRoleService.update(name, dto);
+  async update(@Param('name') name: string, @Body() dto: UpdateSportDto) {
+    const { oldData, newData } = await this.sportService.update(name, dto);
 
     // TODO: Error Exception
 
@@ -85,6 +85,6 @@ export class UserRoleController {
   async delete(@Param('name') name: string) {
     // TODO: Error Exception
 
-    await this.userRoleService.delete(name);
+    await this.sportService.delete(name);
   }
 }
