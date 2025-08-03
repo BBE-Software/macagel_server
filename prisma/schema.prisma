@@ -16,7 +16,10 @@ datasource db {
 
 // user_roles
 model RoleDefinition {
-  id String @id @db.Text
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  label       String
+  description String
 
   @@map("user_roles")
 }
