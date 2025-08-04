@@ -40,6 +40,8 @@ export class UsersService {
       where: { id },
     });
 
+    // TODO: Error Exception
+
     const newData = await this.prisma.user.update({
       where: { id },
       data: dto,
