@@ -7,5 +7,5 @@ export interface RequestUser {
 }
 
 export interface RequestWithUser extends Request {
-  user?: RequestUser;
+  user: RequestUser;
 }

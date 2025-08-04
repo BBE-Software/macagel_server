@@ -24,7 +24,7 @@ export class UserRoleController {
 
   @Get()
   @HttpCode(200)
-  async getAll() {
+  async getAllUserRoles() {
     const roles = await this.userRoleService.getAll();
 
     // TODO: Error Exception
@@ -37,7 +37,7 @@ export class UserRoleController {
 
   @Get(':name')
   @HttpCode(200)
-  async getOne(@Param('name') name: string) {
+  async getUserRole(@Param('name') name: string) {
     const role = await this.userRoleService.getOne(name);
 
     // TODO: Error Exception
@@ -51,7 +51,7 @@ export class UserRoleController {
   @Post()
   @HttpCode(201)
   @Roles(Role.SUPER_ADMIN)
-  async create(@Body() dto: CreateRoleDto) {
+  async createUserRole(@Body() dto: CreateRoleDto) {
     const role = await this.userRoleService.create(dto);
 
     // TODO: Error Exception
@@ -65,7 +65,10 @@ export class UserRoleController {
   @Patch(':name')
   @HttpCode(200)
   @Roles(Role.SUPER_ADMIN)
-  async update(@Param('name') name: string, @Body() dto: UpdateRoleDto) {
+  async updateUserRole(
+    @Param('name') name: string,
+    @Body() dto: UpdateRoleDto,
+  ) {
     const { oldData, newData } = await this.userRoleService.update(name, dto);
 
     // TODO: Error Exception
@@ -82,7 +85,7 @@ export class UserRoleController {
   @Delete(':name')
   @HttpCode(204)
   @Roles(Role.SUPER_ADMIN)
-  async delete(@Param('name') name: string) {
+  async deleteUserRole(@Param('name') name: string) {
     // TODO: Error Exception
 
     await this.userRoleService.delete(name);

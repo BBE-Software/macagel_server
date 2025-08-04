@@ -24,7 +24,7 @@ export class SportsController {
 
   @Get()
   @HttpCode(200)
-  async getAll() {
+  async getAllSports() {
     const sports = await this.sportService.getAll();
 
     // TODO: Error Exception
@@ -37,7 +37,7 @@ export class SportsController {
 
   @Get(':name')
   @HttpCode(200)
-  async getOne(@Param('name') name: string) {
+  async getSport(@Param('name') name: string) {
     const sport = await this.sportService.getOne(name);
 
     // TODO: Error Exception
@@ -51,7 +51,7 @@ export class SportsController {
   @Post()
   @HttpCode(201)
   @Roles(Role.SUPER_ADMIN)
-  async create(@Body() dto: CreateSportDto) {
+  async createSport(@Body() dto: CreateSportDto) {
     const sport = await this.sportService.create(dto);
 
     // TODO: Error Exception
@@ -65,7 +65,7 @@ export class SportsController {
   @Patch(':name')
   @HttpCode(200)
   @Roles(Role.SUPER_ADMIN)
-  async update(@Param('name') name: string, @Body() dto: UpdateSportDto) {
+  async updateSport(@Param('name') name: string, @Body() dto: UpdateSportDto) {
     const { oldData, newData } = await this.sportService.update(name, dto);
 
     // TODO: Error Exception
@@ -82,7 +82,7 @@ export class SportsController {
   @Delete(':name')
   @HttpCode(204)
   @Roles(Role.SUPER_ADMIN)
-  async delete(@Param('name') name: string) {
+  async deleteSport(@Param('name') name: string) {
     // TODO: Error Exception
 
     await this.sportService.delete(name);
