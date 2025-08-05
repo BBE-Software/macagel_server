@@ -6,8 +6,9 @@ import { UsersModule } from './modules/users/user.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { MatchLobbyModule } from './modules/match-lobby/match-lobby.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UserRoleModule, SportModule, UsersModule, MessagesModule, FriendsModule],
+  imports: [PrismaModule, AuthModule, UserRoleModule, SportModule, UsersModule, MessagesModule, FriendsModule, MatchLobbyModule],
 })
 export class AppModule {}
