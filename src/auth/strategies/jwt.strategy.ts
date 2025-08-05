@@ -15,8 +15,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   validate(payload: any): RequestUser {
+    console.log('🔐 JWT Strategy validate çağrıldı');
+    console.log('📄 Payload:', JSON.stringify(payload, null, 2));
+    
+    const userId = payload.sub || payload.id || 'temp-user-id';
+    console.log('👤 Extracted User ID:', userId);
+    
     return {
-      id: payload.sub || payload.id || 'temp-user-id',
+      id: userId,
       role: Role.USER,
     };
   }

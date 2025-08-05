@@ -105,4 +105,38 @@ export class AuthService {
       message: 'User logged out successfully',
     };
   }
+
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        surname: true,
+        nickname: true,
+        birthday: true,
+        height: true,
+        weight: true,
+        gender: true,
+        position: true,
+        preferred_foot: true,
+        show_gender: true,
+        show_height: true,
+        show_weight: true,
+        country_code: true,
+        is_private: true,
+        is_active: true,
+        created_at: true,
+        updated_at: true,
+        role_name: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
+
+    return user;
+  }
 }

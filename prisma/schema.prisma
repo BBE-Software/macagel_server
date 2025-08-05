@@ -60,5 +60,151 @@ model User {
   role_name String
   role      UserRoles @relation(fields: [role_name], references: [name])
 
+  // Messaging relationships
+  sentMessages       Message[]      @relation("SentMessages")
+  receivedMessages   Message[]      @relation("ReceivedMessages")
+  conversations1     Conversation[] @relation("User1Conversations")
+  conversations2     Conversation[] @relation("User2Conversations")
+
+  // Friend relationships
+  sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+  friends1              Friend[]        @relation("User1Friends")
+  friends2              Friend[]        @relation("User2Friends")
+
+  // Match lobby relationships
+  createdLobbies         MatchLobby[]        @relation("CreatedLobbies")
+  matchParticipations    MatchParticipant[]  @relation("MatchParticipations")
+  sentMatchInvitations   MatchInvitation[]   @relation("SentMatchInvitations")
+  receivedMatchInvitations MatchInvitation[] @relation("ReceivedMatchInvitations")
+
   @@map("users")
+}
+
+// conversations
+model Conversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  user1_id    String   @db.Uuid
+  user2_id    String   @db.Uuid
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user1    User      @relation("User1Conversations", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2    User      @relation("User2Conversations", fields: [user2_id], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([user1_id, user2_id])
+  @@map("conversations")
+}
+
+// messages
+model Message {
+  id              String   @id @default(uuid()) @db.Uuid
+  conversation_id String   @db.Uuid
+  sender_id       String   @db.Uuid
+  receiver_id     String   @db.Uuid
+  content         String
+  message_type    String   @default("text") @db.VarChar(20)
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver     User         @relation("ReceivedMessages", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// friend_requests
+model FriendRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  sender_id   String   @db.Uuid
+  receiver_id String   @db.Uuid
+  status      String   @default("pending") @db.VarChar(20) // pending, accepted, rejected
+  message     String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  sender   User @relation("SentFriendRequests", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedFriendRequests", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@unique([sender_id, receiver_id])
+  @@map("friend_requests")
+}
+
+// friends
+model Friend {
+  id         String   @id @default(uuid()) @db.Uuid
+  user1_id   String   @db.Uuid
+  user2_id   String   @db.Uuid
+  created_at DateTime @default(now())
+
+  user1 User @relation("User1Friends", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2 User @relation("User2Friends", fields: [user2_id], references: [id], onDelete: Cascade)
+
+  @@unique([user1_id, user2_id])
+  @@map("friends")
+}
+
+// match_lobbies - Maç lobisi
+model MatchLobby {
+  id              String   @id @default(uuid()) @db.Uuid
+  title           String   @db.VarChar(255) // Maç başlığı
+  description     String?  @db.Text // Maç açıklaması
+  location        String   @db.VarChar(255) // Konum
+  latitude        Float? // Enlem
+  longitude       Float? // Boylam
+  date            DateTime // Maç tarihi
+  duration        Int      @default(90) // Süre (dakika)
+  max_players     Int      @default(22) // Maksimum oyuncu sayısı
+  current_players Int      @default(0) // Mevcut oyuncu sayısı
+  price_per_person Float?  // Kişi başı ücret
+  is_private      Boolean  @default(false) // Özel maç mı
+  status          String   @default("open") @db.VarChar(20) // open, full, started, finished, cancelled
+  creator_id      String   @db.Uuid // Lobiciyi oluşturan kullanıcı
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  creator      User                @relation("CreatedLobbies", fields: [creator_id], references: [id], onDelete: Cascade)
+  participants MatchParticipant[]
+  invitations  MatchInvitation[]
+
+  @@map("match_lobbies")
+}
+
+// match_participants - Maça katılan oyuncular
+model MatchParticipant {
+  id           String   @id @default(uuid()) @db.Uuid
+  lobby_id     String   @db.Uuid
+  user_id      String   @db.Uuid
+  status       String   @default("joined") @db.VarChar(20) // joined, left, kicked
+  position     String?  @db.VarChar(50) // Oyuncu pozisyonu
+  joined_at    DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  lobby MatchLobby @relation(fields: [lobby_id], references: [id], onDelete: Cascade)
+  user  User       @relation("MatchParticipations", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([lobby_id, user_id])
+  @@map("match_participants")
+}
+
+// match_invitations - Maç davetleri
+model MatchInvitation {
+  id         String   @id @default(uuid()) @db.Uuid
+  lobby_id   String   @db.Uuid
+  sender_id  String   @db.Uuid
+  receiver_id String  @db.Uuid
+  status     String   @default("pending") @db.VarChar(20) // pending, accepted, rejected
+  message    String?  @db.Text // Davet mesajı
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  lobby    MatchLobby @relation(fields: [lobby_id], references: [id], onDelete: Cascade)
+  sender   User       @relation("SentMatchInvitations", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User       @relation("ReceivedMatchInvitations", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@unique([lobby_id, receiver_id])
+  @@map("match_invitations")
 }
