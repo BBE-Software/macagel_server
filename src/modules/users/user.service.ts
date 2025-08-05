@@ -60,7 +60,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const user = await this.prisma.user.create({
-      data: dto,
+      data: dto.toPrisma(),
     });
 
     // TODO: Error Exception

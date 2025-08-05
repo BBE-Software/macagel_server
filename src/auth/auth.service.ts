@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -14,6 +14,7 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
   async signup(dto: SignupDto) {
+    // 1. Supabase auth'da user oluştur
     const { data, error } = await this.supabase.auth.admin.createUser({
       email: dto.email,
       password: dto.password,
@@ -21,16 +22,50 @@ export class AuthService {
     });
 
     if (error || !data.user) {
-      throw new Error(`Signup failed: ${error?.message}`);
+      // E-mail zaten kayıtlı hatası
+      if (error?.message?.includes('already been registered')) {
+        throw new BadRequestException('Bu e-mail adresi zaten kayıtlı. Lütfen farklı bir e-mail deneyin.');
+      }
+      // Diğer hatalar
+      throw new BadRequestException(`Kayıt işlemi başarısız: ${error?.message || 'Bilinmeyen hata'}`);
     }
 
-    return {
-      status: 'success',
-      message: 'User created in auth. Please complete your profile.',
-      data: {
-        user_id: data.user.id,
-      },
-    };
+    try {
+      // 2. Prisma database'de User kaydı oluştur
+      // Email'den nickname oluştur (16 karakter limit)
+      const emailUsername = dto.email.split('@')[0];
+      const shortNickname = emailUsername.length > 12 
+        ? emailUsername.substring(0, 12) 
+        : emailUsername;
+      const uniqueNickname = `${shortNickname}${Date.now().toString().slice(-3)}`;
+
+      const user = await this.prisma.user.create({
+        data: {
+          id: data.user.id,
+          email: dto.email,
+          name: dto.name || 'Kullanıcı', // Fallback değer
+          surname: dto.surname || 'Soyadı', // Fallback değer
+          nickname: uniqueNickname, // 16 karakter altında unique nickname
+          birthday: dto.birthday ? new Date(dto.birthday) : new Date('2000-01-01'), // Fallback tarih
+          gender: dto.gender || 'Belirtilmemiş', // Fallback cinsiyet
+          country_code: 'TR', // Varsayılan Türkiye
+          role_name: 'user', // Varsayılan rol (user_roles tablosunda mevcut)
+        },
+      });
+
+      return {
+        status: 'success',
+        message: 'Kullanıcı başarıyla oluşturuldu. Profil bilgilerinizi tamamlayın.',
+        data: {
+          user_id: data.user.id,
+          database_user: user,
+        },
+      };
+    } catch (prismaError: any) {
+      // Database hatası olursa Supabase'den de kullanıcıyı sil
+      await this.supabase.auth.admin.deleteUser(data.user.id);
+      throw new BadRequestException(`Database kayıt hatası: ${prismaError?.message || 'Bilinmeyen hata'}`);
+    }
   }
 
   async login(dto: LoginDto) {
@@ -40,7 +75,12 @@ export class AuthService {
     });
 
     if (error || !data.session) {
-      throw new Error(`Login failed: ${error?.message}`);
+      // Geçersiz credentials hatası
+      if (error?.message?.includes('Invalid login credentials')) {
+        throw new UnauthorizedException('E-posta veya şifre hatalı. Lütfen tekrar deneyin.');
+      }
+      // Diğer hatalar
+      throw new BadRequestException(`Giriş işlemi başarısız: ${error?.message || 'Bilinmeyen hata'}`);
     }
 
     return {

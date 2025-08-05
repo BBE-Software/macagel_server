@@ -51,6 +51,16 @@ export class UpdateUserDto {
   gender?: string;
 
   @IsOptional()
+  @IsString()
+  @Length(1, 32)
+  position?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 16)
+  preferred_foot?: string;
+
+  @IsOptional()
   @IsBoolean()
   show_gender?: boolean;
 

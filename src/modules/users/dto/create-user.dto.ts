@@ -1,8 +1,11 @@
 import { Prisma } from '@prisma/client';
-import { IsDateString, IsString, Length, Matches } from 'class-validator';
+import { IsDateString, IsEmail, IsString, Length, Matches } from 'class-validator';
 import { UpdateUserDto } from './update-user.dto';
 
 export class CreateUserDto extends UpdateUserDto {
+  @IsEmail()
+  declare email: string;
+
   @IsString()
   declare name: string;
 
