@@ -9,4 +9,6 @@ export class CreateMatchLobbyDto {
   max_players?: number;
   price_per_person?: number;
   is_private?: boolean;
+  is_reward_match?: boolean;
+  reward_description?: string;
 }

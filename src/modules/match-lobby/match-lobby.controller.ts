@@ -66,4 +66,36 @@ export class MatchLobbyController {
   async leaveLobby(@Request() req: any, @Param('id') lobbyId: string) {
     return this.matchLobbyService.leaveLobby(lobbyId, req.user.id);
   }
+
+  // Maç lobisini güncelle (sadece oluşturan kişi)
+  @Put(':id')
+  async updateLobby(
+    @Request() req: any,
+    @Param('id') lobbyId: string,
+    @Body() updateLobbyDto: CreateMatchLobbyDto,
+  ) {
+    return this.matchLobbyService.updateLobby(lobbyId, req.user.id, updateLobbyDto);
+  }
+
+  // Katılımcıyı at (sadece oluşturan kişi)
+  @Delete(':id/participants/:participantId')
+  async kickParticipant(
+    @Request() req: any,
+    @Param('id') lobbyId: string,
+    @Param('participantId') participantId: string,
+  ) {
+    return this.matchLobbyService.kickParticipant(lobbyId, req.user.id, participantId);
+  }
+
+  // Maç lobisini sil (sadece oluşturan kişi)
+  @Delete(':id')
+  async deleteLobby(@Request() req: any, @Param('id') lobbyId: string) {
+    return this.matchLobbyService.deleteLobby(lobbyId, req.user.id);
+  }
+
+  // Süresi geçen maçları temizle (admin endpoint)
+  @Post('cleanup')
+  async cleanupExpiredMatches(@Request() req: any) {
+    return this.matchLobbyService.cleanupExpiredMatches();
+  }
 }

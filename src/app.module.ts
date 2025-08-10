@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { SportModule } from './modules/sports/sport.module';
 import { UserRoleModule } from './modules/user-roles/user-role.module';
@@ -10,6 +11,17 @@ import { MatchLobbyModule } from './modules/match-lobby/match-lobby.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UserRoleModule, SportModule, UsersModule, MessagesModule, FriendsModule, MatchLobbyModule, NotificationsModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    PrismaModule, 
+    AuthModule, 
+    UserRoleModule, 
+    SportModule, 
+    UsersModule, 
+    MessagesModule, 
+    FriendsModule, 
+    MatchLobbyModule, 
+    NotificationsModule
+  ],
 })
 export class AppModule {}

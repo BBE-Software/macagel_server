@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
+import { encryptMessageContent, decryptMessageContent } from '../../utils/crypto.util';
 
 @Injectable()
 export class MessagesService {
@@ -10,7 +11,7 @@ export class MessagesService {
   async createMessage(senderId: string, createMessageDto: CreateMessageDto) {
     const { receiverId, content, messageType } = createMessageDto;
     
-    console.log('💬 CreateMessage başladı:', { senderId, receiverId, content, messageType });
+    console.log('💬 CreateMessage başladı:', { senderId, receiverId, messageType });
 
     // Check if users exist
     const [sender, receiver] = await Promise.all([
@@ -68,16 +69,24 @@ export class MessagesService {
       conversation_id: conversation.id,
       sender_id: senderId,
       receiver_id: receiverId,
-      content,
       message_type: messageType || 'text',
     });
+
+    // İçeriği şifrele
+    let encryptedContent: string;
+    try {
+      encryptedContent = encryptMessageContent(content);
+    } catch (e) {
+      console.error('❌ Mesaj içeriği şifrelenemedi:', e);
+      throw new InternalServerErrorException('Mesaj şifreleme hatası');
+    }
 
     const message = await this.prisma.message.create({
       data: {
         conversation_id: conversation.id,
         sender_id: senderId,
         receiver_id: receiverId,
-        content,
+        content: encryptedContent,
         message_type: messageType || 'text',
       },
       include: {
@@ -91,7 +100,19 @@ export class MessagesService {
     });
 
     console.log('✅ Mesaj başarıyla oluşturuldu:', message.id);
-    return message;
+    // İstemci uyumluluğu için içerik çözülerek döndürülür
+    let decrypted: string;
+    try {
+      decrypted = decryptMessageContent(message.content);
+    } catch (e) {
+      console.error('❌ Mesaj içeriği çözülemedi, orijinal içerik döndürülüyor:', e);
+      // Eski düz metin mesajlar için orijinal içeriği koru
+      decrypted = message.content;
+    }
+    return {
+      ...message,
+      content: decrypted,
+    };
   }
 
   async getConversations(userId: string) {
@@ -161,7 +182,9 @@ export class MessagesService {
               id: lastMessage.id,
               senderId: lastMessage.sender_id,
               senderName: `${lastMessage.sender.name} ${lastMessage.sender.surname}`,
-              content: lastMessage.content,
+              content: (() => {
+                try { return decryptMessageContent(lastMessage.content); } catch { return lastMessage.content; }
+              })(),
               timestamp: lastMessage.created_at,
               type: lastMessage.message_type,
               isRead: lastMessage.is_read,
@@ -252,7 +275,7 @@ export class MessagesService {
       senderId: msg.sender_id,
       senderName: `${msg.sender.name} ${msg.sender.surname}`,
       receiverId: msg.receiver_id,
-      content: msg.content,
+      content: (() => { try { return decryptMessageContent(msg.content); } catch { return msg.content; } })(),
       timestamp: msg.created_at,
       type: msg.message_type,
       isRead: msg.is_read,

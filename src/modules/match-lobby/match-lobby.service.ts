@@ -1,15 +1,102 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMatchLobbyDto } from './dto/create-match-lobby.dto';
 import { JoinLobbyDto } from './dto/join-lobby.dto';
+import moment from 'moment-timezone';
 
 @Injectable()
 export class MatchLobbyService {
   constructor(private prisma: PrismaService) {}
 
+  // Türkiye saatini al
+  private getTurkeyTime(): Date {
+    return moment().tz('Europe/Istanbul').toDate();
+  }
+
+  // Her 5 dakikada bir süresi geçen maçları temizle
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleCleanupExpiredMatches() {
+    console.log('⏰ Scheduled cleanup başlatılıyor...');
+    await this.cleanupExpiredMatches();
+  }
+
+  // Maçları otomatik olarak temizle (süresi geçen maçları işaretle)
+  async cleanupExpiredMatches() {
+    console.log('🧹 Süresi geçen maçlar işaretleniyor...');
+    
+    const now = this.getTurkeyTime(); // Türkiye saati kullan
+    console.log('🕐 Şu anki Türkiye saati:', now);
+    
+    try {
+      // Tüm açık maçları getir
+      const allOpenMatches = await this.prisma.matchLobby.findMany({
+        where: {
+          status: {
+            in: ['open', 'full'], // Sadece açık ve dolu maçları kontrol et
+          },
+          time_over: false, // Sadece henüz süresi geçmemiş olanları kontrol et
+        },
+        select: {
+          id: true,
+          title: true,
+          date: true,
+          duration: true,
+        },
+      });
+
+      console.log(`📊 Toplam ${allOpenMatches.length} açık maç bulundu`);
+
+      let markedCount = 0;
+      
+      // Her maç için süre kontrolü yap
+      for (const match of allOpenMatches) {
+        // Veritabanındaki tarihi doğrudan kullan (timezone dönüşümü yapma)
+        const matchDate = new Date(match.date);
+        const matchEndTime = new Date(matchDate.getTime() + (match.duration * 60 * 1000)); // dakika -> milisaniye
+        
+        console.log(`🔍 Maç kontrolü: ${match.title}`);
+        console.log(`   Veritabanındaki tarih: ${match.date}`);
+        console.log(`   Maç tarihi (parsed): ${matchDate.toISOString()}`);
+        console.log(`   Maç süresi: ${match.duration} dakika`);
+        console.log(`   Bitiş zamanı: ${matchEndTime.toISOString()}`);
+        console.log(`   Şu an: ${now.toISOString()}`);
+        console.log(`   Süresi geçti mi: ${now > matchEndTime}`);
+        
+        if (now > matchEndTime) {
+          console.log(`⏰ Maç süresi geçti işaretleniyor: ${match.title} (${matchDate.toISOString()})`);
+          
+          // Maçı time_over = true olarak işaretle (silme)
+          await this.prisma.matchLobby.update({
+            where: { id: match.id },
+            data: { time_over: true },
+          });
+          
+          console.log(`✅ Maç süresi geçti işaretlendi: ${match.title}`);
+          markedCount++;
+        }
+      }
+      
+      console.log(`✅ Maç temizleme işlemi tamamlandı. ${markedCount} maç işaretlendi.`);
+    } catch (error) {
+      console.error('❌ Maç temizleme hatası:', error);
+    }
+  }
+
   // Maç lobisi oluştur
   async createLobby(userId: string, createLobbyDto: CreateMatchLobbyDto) {
     console.log('🏆 Yeni maç lobisi oluşturuluyor...', createLobbyDto);
+
+    // Gelen UTC tarihi Türkiye saatine çevir
+    console.log('📥 Gelen tarih (raw):', createLobbyDto.date);
+    
+    // Gelen tarihi parse et (UTC olarak geliyor)
+    const utcDate = new Date(createLobbyDto.date);
+    console.log('📥 Gelen tarih (UTC):', utcDate.toISOString());
+    
+    // UTC'yi Türkiye saatine çevir (+3 saat)
+    const turkeyDate = new Date(utcDate.getTime() + (3 * 60 * 60 * 1000));
+    console.log('🇹🇷 Türkiye saati: ${turkeyDate.toISOString()}');
 
     const lobby = await this.prisma.matchLobby.create({
       data: {
@@ -18,11 +105,13 @@ export class MatchLobbyService {
         location: createLobbyDto.location,
         latitude: createLobbyDto.latitude,
         longitude: createLobbyDto.longitude,
-        date: new Date(createLobbyDto.date),
+        date: turkeyDate, // Türkiye saati olarak kaydet
         duration: createLobbyDto.duration || 90,
         max_players: createLobbyDto.max_players || 22,
         price_per_person: createLobbyDto.price_per_person,
         is_private: createLobbyDto.is_private || false,
+        is_reward_match: createLobbyDto.is_reward_match || false,
+        reward_description: createLobbyDto.reward_description,
         creator_id: userId,
         current_players: 1, // Oluşturan kişi otomatik katılır
       },
@@ -59,6 +148,7 @@ export class MatchLobbyService {
 
     const where: any = {
       status: filters?.status || 'open',
+      time_over: false, // Sadece süresi geçmemiş maçları getir
     };
 
     if (filters?.location) {
@@ -246,5 +336,164 @@ export class MatchLobbyService {
     });
 
     return participations.map(p => p.lobby);
+  }
+
+  // Maç lobisini güncelle (sadece oluşturan kişi)
+  async updateLobby(lobbyId: string, userId: string, updateLobbyDto: CreateMatchLobbyDto) {
+    console.log('✏️ Lobi güncelleme isteği...', { lobbyId, userId });
+
+    // Lobi kontrolü
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: lobbyId },
+      include: { participants: true },
+    });
+
+    if (!lobby) {
+      throw new NotFoundException('Maç lobisi bulunamadı');
+    }
+
+    // Sadece oluşturan kişi güncelleyebilir
+    if (lobby.creator_id !== userId) {
+      throw new ForbiddenException('Bu lobiyi güncelleme yetkiniz yok. Sadece lobi sahibi güncelleyebilir.');
+    }
+
+    // Lobi durumu kontrolü - başlamış veya bitmiş maçlar güncellenemez
+    if (lobby.status === 'started' || lobby.status === 'finished') {
+      throw new BadRequestException('Başlamış veya bitmiş lobiler güncellenemez');
+    }
+
+    // Max oyuncu sayısı mevcut oyuncu sayısından az olamaz
+    if (updateLobbyDto.max_players && updateLobbyDto.max_players < lobby.current_players) {
+      throw new BadRequestException('Maksimum oyuncu sayısı mevcut katılımcı sayısından az olamaz');
+    }
+
+    // Lobi güncelle
+    const updatedLobby = await this.prisma.matchLobby.update({
+      where: { id: lobbyId },
+      data: {
+        title: updateLobbyDto.title,
+        description: updateLobbyDto.description,
+        location: updateLobbyDto.location,
+        latitude: updateLobbyDto.latitude,
+        longitude: updateLobbyDto.longitude,
+        date: new Date(updateLobbyDto.date),
+        duration: updateLobbyDto.duration || lobby.duration,
+        max_players: updateLobbyDto.max_players || lobby.max_players,
+        price_per_person: updateLobbyDto.price_per_person,
+        is_private: updateLobbyDto.is_private ?? lobby.is_private,
+        // Status'u kontrol et
+        status: (updateLobbyDto.max_players && updateLobbyDto.max_players <= lobby.current_players) 
+          ? 'full' 
+          : 'open',
+      },
+      include: {
+        creator: {
+          select: { id: true, name: true, surname: true, nickname: true },
+        },
+        participants: {
+          include: {
+            user: {
+              select: { id: true, name: true, surname: true, nickname: true, position: true },
+            },
+          },
+          where: { status: 'joined' },
+        },
+      },
+    });
+
+    console.log('✅ Lobi başarıyla güncellendi');
+    return updatedLobby;
+  }
+
+  // Katılımcıyı at (sadece oluşturan kişi)
+  async kickParticipant(lobbyId: string, userId: string, participantId: string) {
+    console.log('👢 Katılımcı atma isteği...', { lobbyId, userId, participantId });
+
+    // Lobi kontrolü
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: lobbyId },
+      include: { participants: true },
+    });
+
+    if (!lobby) {
+      throw new NotFoundException('Maç lobisi bulunamadı');
+    }
+
+    // Sadece oluşturan kişi atabilir
+    if (lobby.creator_id !== userId) {
+      throw new ForbiddenException('Katılımcı atma yetkiniz yok. Sadece lobi sahibi atabilir.');
+    }
+
+    // Lobi sahibi kendini atamaz
+    if (participantId === userId) {
+      throw new BadRequestException('Lobi sahibi kendini maçtan atamaz');
+    }
+
+    // Katılımcı kontrolü
+    const participation = await this.prisma.matchParticipant.findFirst({
+      where: {
+        lobby_id: lobbyId,
+        user_id: participantId,
+        status: 'joined',
+      },
+    });
+
+    if (!participation) {
+      throw new NotFoundException('Bu kullanıcı bu lobiye katılmamış');
+    }
+
+    // Katılımcıyı at
+    await this.prisma.matchParticipant.update({
+      where: { id: participation.id },
+      data: { status: 'kicked' },
+    });
+
+    // Lobi oyuncu sayısını güncelle
+    await this.prisma.matchLobby.update({
+      where: { id: lobbyId },
+      data: {
+        current_players: { decrement: 1 },
+        status: 'open', // Birini attığımızda tekrar açık olur
+      },
+    });
+
+    console.log('✅ Katılımcı başarıyla atıldı');
+    return { message: 'Katılımcı başarıyla atıldı' };
+  }
+
+  // Maç lobisini sil (sadece oluşturan kişi)
+  async deleteLobby(lobbyId: string, userId: string) {
+    console.log('🗑️ Lobi silme isteği...', { lobbyId, userId });
+
+    // Lobi kontrolü
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: lobbyId },
+      include: { 
+        participants: true,
+        invitations: true,
+      },
+    });
+
+    if (!lobby) {
+      throw new NotFoundException('Maç lobisi bulunamadı');
+    }
+
+    // Sadece oluşturan kişi silebilir
+    if (lobby.creator_id !== userId) {
+      throw new ForbiddenException('Bu lobiyi silme yetkiniz yok. Sadece lobi sahibi silebilir.');
+    }
+
+    // Lobi durumu kontrolü - başlamış veya bitmiş maçlar silinemez
+    if (lobby.status === 'started' || lobby.status === 'finished') {
+      throw new BadRequestException('Başlamış veya bitmiş lobiler silinemez');
+    }
+
+    // İlgili tüm kayıtları sil (Prisma cascade işlemi yapacak)
+    await this.prisma.matchLobby.delete({
+      where: { id: lobbyId },
+    });
+
+    console.log('✅ Lobi başarıyla silindi');
+    return { message: 'Lobi başarıyla silindi' };
   }
 }

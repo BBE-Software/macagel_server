@@ -143,7 +143,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       console.log('📤 Mesaj gönderme işlemi başlatılıyor...', {
         senderId,
         receiverId,
-        content,
         messageType
       });
 

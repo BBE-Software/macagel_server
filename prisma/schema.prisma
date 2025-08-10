@@ -165,6 +165,9 @@ model MatchLobby {
   current_players Int      @default(0) // Mevcut oyuncu sayısı
   price_per_person Float?  // Kişi başı ücret
   is_private      Boolean  @default(false) // Özel maç mı
+  is_reward_match Boolean  @default(false) // Ödüllü maç mı
+  reward_description String? @db.Text // Ödül açıklaması
+  time_over       Boolean  @default(false) // Maç süresi geçti mi
   status          String   @default("open") @db.VarChar(20) // open, full, started, finished, cancelled
   creator_id      String   @db.Uuid // Lobiciyi oluşturan kullanıcı
   created_at      DateTime @default(now())
