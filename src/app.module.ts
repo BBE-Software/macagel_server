@@ -9,6 +9,8 @@ import { FriendsModule } from './modules/friends/friends.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MatchLobbyModule } from './modules/match-lobby/match-lobby.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { TeamMatchesModule } from './modules/team-matches/team-matches.module';
 
 @Module({
   imports: [
@@ -21,7 +23,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     MessagesModule, 
     FriendsModule, 
     MatchLobbyModule, 
-    NotificationsModule
+    NotificationsModule,
+    TeamsModule,
+    TeamMatchesModule
   ],
 })
 export class AppModule {}

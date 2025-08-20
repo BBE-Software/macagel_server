@@ -78,9 +78,16 @@ model User {
   sentMatchInvitations   MatchInvitation[]   @relation("SentMatchInvitations")
   receivedMatchInvitations MatchInvitation[] @relation("ReceivedMatchInvitations")
 
+  // Team match relationships
+  createdTeamMatches     TeamMatch[]         @relation("CreatedTeamMatches")
+
   // Notification relationships
   sentNotifications     Notification[] @relation("SentNotifications")
   receivedNotifications Notification[] @relation("ReceivedNotifications")
+
+  // Team relationships
+  createdTeams          Team[]         @relation("CreatedTeams")
+  teamMembers           TeamMember[]   @relation("TeamMembers")
 
   @@map("users")
 }
@@ -235,4 +242,70 @@ model Notification {
   receiver User @relation("ReceivedNotifications", fields: [receiver_id], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// teams - Takımlar
+model Team {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(100) // Takım adı
+  description     String?  @db.Text // Takım açıklaması
+  city            String   @db.VarChar(100) // Şehir
+  level           String   @db.VarChar(50) // Seviye (amateur, semi-pro, professional)
+  max_players     Int      @default(22) // Maksimum oyuncu sayısı
+  current_players Int      @default(0) // Mevcut oyuncu sayısı
+  logo_url        String?  @db.VarChar(255) // Takım logosu
+  is_active       Boolean  @default(true) // Aktif mi
+  creator_id      String   @db.Uuid // Takımı oluşturan kullanıcı
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  creator      User         @relation("CreatedTeams", fields: [creator_id], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+  homeMatches  TeamMatch[]  @relation("HomeTeamMatches")
+  awayMatches  TeamMatch[]  @relation("AwayTeamMatches")
+
+  @@map("teams")
+}
+
+// team_members - Takım üyeleri
+model TeamMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  team_id    String   @db.Uuid
+  user_id    String   @db.Uuid
+  position   String?  @db.VarChar(50) // Oyuncu pozisyonu
+  role       String   @default("member") @db.VarChar(20) // member, captain, coach
+  joined_at  DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user User @relation("TeamMembers", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([team_id, user_id])
+  @@map("team_members")
+}
+
+// team_matches - Takım maçları
+model TeamMatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  title           String   @db.VarChar(255) // Maç başlığı
+  description     String?  @db.Text // Maç açıklaması
+  location        String   @db.VarChar(255) // Konum
+  latitude        Float? // Enlem
+  longitude       Float? // Boylam
+  date            DateTime // Maç tarihi
+  duration        Int      @default(90) // Süre (dakika)
+  match_type      String   @db.VarChar(20) // 5v5, 7v7, 11v11
+  price_per_person Float?  // Kişi başı ücret
+  home_team_id    String   @db.Uuid // Ev sahibi takım
+  away_team_id    String?  @db.Uuid // Deplasman takımı (null ise rakip aranıyor)
+  status          String   @default("open") @db.VarChar(20) // open, matched, confirmed, started, finished, cancelled
+  creator_id      String   @db.Uuid // Maçı oluşturan kullanıcı
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  creator   User      @relation("CreatedTeamMatches", fields: [creator_id], references: [id], onDelete: Cascade)
+  homeTeam  Team      @relation("HomeTeamMatches", fields: [home_team_id], references: [id], onDelete: Cascade)
+  awayTeam  Team?     @relation("AwayTeamMatches", fields: [away_team_id], references: [id], onDelete: Cascade)
+
+  @@map("team_matches")
 }
