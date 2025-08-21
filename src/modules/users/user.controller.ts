@@ -71,6 +71,19 @@ export class UsersController {
     };
   }
 
+  @Get('profile/:id')
+  @HttpCode(200)
+  async getUserProfile(@Param('id') id: string) {
+    const user = await this.usersService.getById(id);
+
+    // TODO: Error Exception
+
+    return {
+      status: 'success',
+      data: user,
+    };
+  }
+
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @Get()
   @HttpCode(200)
