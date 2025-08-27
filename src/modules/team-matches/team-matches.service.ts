@@ -8,10 +8,32 @@ export class TeamMatchesService {
   constructor(private prisma: PrismaService) {}
 
   async createTeamMatch(userId: string, createTeamMatchDto: CreateTeamMatchDto) {
+    // Snake case field'ları camelCase'e çevir
+    const matchType = createTeamMatchDto.matchType || createTeamMatchDto.match_type || '11v11';
+    const pricePerPerson = createTeamMatchDto.pricePerPerson || createTeamMatchDto.price_per_person;
+    const homeTeamId = createTeamMatchDto.homeTeamId || createTeamMatchDto.home_team_id;
+    const duration = createTeamMatchDto.duration || 90; // Default 90 dakika
+
+    if (!homeTeamId) {
+      throw new Error('home_team_id is required');
+    }
+
+    if (!createTeamMatchDto.title) {
+      throw new Error('title is required');
+    }
+
+    if (!createTeamMatchDto.location) {
+      throw new Error('location is required');
+    }
+
+    if (!createTeamMatchDto.date) {
+      throw new Error('date is required');
+    }
+
     // Kullanıcının takımın üyesi olduğunu kontrol et
     const teamMember = await this.prisma.teamMember.findFirst({
       where: {
-        team_id: createTeamMatchDto.homeTeamId,
+        team_id: homeTeamId,
         user_id: userId,
       },
     });
@@ -28,10 +50,10 @@ export class TeamMatchesService {
         latitude: createTeamMatchDto.latitude,
         longitude: createTeamMatchDto.longitude,
         date: new Date(createTeamMatchDto.date),
-        duration: createTeamMatchDto.duration,
-        match_type: createTeamMatchDto.matchType,
-        price_per_person: createTeamMatchDto.pricePerPerson,
-        home_team_id: createTeamMatchDto.homeTeamId,
+        duration: duration,
+        match_type: matchType,
+        price_per_person: pricePerPerson,
+        home_team_id: homeTeamId,
         creator_id: userId,
       },
       include: {

@@ -22,18 +22,34 @@ export class CreateTeamMatchDto {
   @IsDateString()
   date: string;
 
+  @IsOptional()
   @IsInt()
   @Min(30)
   @Max(180)
-  duration: number;
+  duration?: number;
 
+  @IsOptional()
   @IsEnum(['5v5', '7v7', '11v11'])
-  matchType: string;
+  matchType?: string;
 
   @IsOptional()
   @IsNumber()
   pricePerPerson?: number;
 
+  @IsOptional()
   @IsString()
-  homeTeamId: string;
+  homeTeamId?: string;
+
+  // Snake case aliases for compatibility
+  @IsOptional()
+  @IsEnum(['5v5', '7v7', '11v11'])
+  match_type?: string;
+
+  @IsOptional()
+  @IsNumber()
+  price_per_person?: number;
+
+  @IsOptional()
+  @IsString()
+  home_team_id?: string;
 }
