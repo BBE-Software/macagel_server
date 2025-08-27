@@ -9,51 +9,60 @@ export class TeamsService {
   constructor(private prisma: PrismaService) {}
 
   async createTeam(userId: string, createTeamDto: CreateTeamDto) {
-    const team = await this.prisma.team.create({
-      data: {
-        name: createTeamDto.name,
-        description: createTeamDto.description,
-        city: createTeamDto.city,
-        level: createTeamDto.level,
-        max_players: createTeamDto.maxPlayers,
-        current_players: 1, // Oluşturan kişi otomatik üye olur
-        logo_url: createTeamDto.logoUrl,
-        creator_id: userId,
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            surname: true,
-            nickname: true,
-          },
+    // Transaction kullanarak hem takım oluştur hem de üye ekle
+    const team = await this.prisma.$transaction(async (prisma) => {
+      // Takımı oluştur
+      const team = await prisma.team.create({
+        data: {
+          name: createTeamDto.name,
+          description: createTeamDto.description,
+          city: createTeamDto.city,
+          level: createTeamDto.level,
+          max_players: createTeamDto.maxPlayers,
+          current_players: 1, // Oluşturan kişi otomatik üye olur
+          logo_url: createTeamDto.logoUrl,
+          creator_id: userId,
         },
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                surname: true,
-                nickname: true,
+      });
+
+      // Oluşturan kişiyi takıma ekle
+      await prisma.teamMember.create({
+        data: {
+          team_id: team.id,
+          user_id: userId,
+          role: 'captain',
+        },
+      });
+
+      // Takımı tüm ilişkileriyle birlikte getir
+      return prisma.team.findUnique({
+        where: { id: team.id },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              surname: true,
+              nickname: true,
+            },
+          },
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  surname: true,
+                  nickname: true,
+                },
               },
             },
           },
         },
-      },
+      });
     });
 
-    // Oluşturan kişiyi takıma ekle
-    await this.prisma.teamMember.create({
-      data: {
-        team_id: team.id,
-        user_id: userId,
-        role: 'captain',
-      },
-    });
-
-    return team;
+    return team!;
   }
 
   async getUserTeams(userId: string) {
