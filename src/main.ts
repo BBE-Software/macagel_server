@@ -2,9 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log'], // Sadece önemli logları tut
-  });
+  const app = await NestFactory.create(AppModule);
 
   // CORS'u enable et - Flutter uygulaması için gerekli
   app.enableCors({

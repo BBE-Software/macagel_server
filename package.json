@@ -8,11 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "node --max-old-space-size=2048 $(pwd)/dist/main.js",
+    "start": "node --max-old-space-size=512 dist/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node --max-old-space-size=2048 $(pwd)/dist/main.js",
-    "start:render": "node --max-old-space-size=2048 $(pwd)/dist/main.js",
+    "start:prod": "node --max-old-space-size=512 dist/main",
     "seed": "ts-node prisma/seed.ts",
     "generate": "prisma generate",
     "push": "prisma db push",
@@ -46,12 +45,12 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "@nestjs/cli": "^11.0.0"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
+    "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/express": "^5.0.0",
