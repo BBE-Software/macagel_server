@@ -9,10 +9,10 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { Roles } from 'src/common/decorators/user-roles.decorator';
-import { Role } from 'src/common/enums/roles.enum';
-import { RolesGuard } from 'src/common/guards/user-roles.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Roles } from '../../common/decorators/user-roles.decorator';
+import { Role } from '../../common/enums/roles.enum';
+import { RolesGuard } from '../../common/guards/user-roles.guard';
 import { CreateSportDto } from './dto/create-sport.dto';
 import { UpdateSportDto } from './dto/update-sport.dto';
 import { SportService } from './sport.service';

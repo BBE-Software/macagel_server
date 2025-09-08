@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, CanActivate, ExecutionContext } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
-import { Role } from 'src/common/enums/roles.enum';
+import { Role } from '../../common/enums/roles.enum';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

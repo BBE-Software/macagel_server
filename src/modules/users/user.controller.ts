@@ -9,11 +9,11 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { Roles } from 'src/common/decorators/user-roles.decorator';
-import { Role } from 'src/common/enums/roles.enum';
-import { RolesGuard } from 'src/common/guards/user-roles.guard';
-import type { RequestWithUser } from 'src/common/types/request-user.type';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Roles } from '../../common/decorators/user-roles.decorator';
+import { Role } from '../../common/enums/roles.enum';
+import { RolesGuard } from '../../common/guards/user-roles.guard';
+import type { RequestWithUser } from '../../common/types/request-user.type';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './user.service';
