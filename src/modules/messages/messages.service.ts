@@ -99,6 +99,12 @@ export class MessagesService {
       },
     });
 
+    // Conversation'ın updated_at alanını güncelle
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { updated_at: new Date() },
+    });
+
     console.log('✅ Mesaj başarıyla oluşturuldu:', message.id);
     // İstemci uyumluluğu için içerik çözülerek döndürülür
     let decrypted: string;
@@ -295,7 +301,7 @@ export class MessagesService {
       throw new ForbiddenException('Bu konuşmaya erişim yetkiniz yok');
     }
 
-    await this.prisma.message.updateMany({
+    const updateResult = await this.prisma.message.updateMany({
       where: {
         conversation_id: conversationId,
         receiver_id: userId,
@@ -304,7 +310,15 @@ export class MessagesService {
       data: { is_read: true },
     });
 
-    return { success: true };
+    // Conversation'ın updated_at alanını güncelle
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updated_at: new Date() },
+    });
+
+    console.log(`✅ ${updateResult.count} mesaj okundu olarak işaretlendi`);
+
+    return { success: true, updatedCount: updateResult.count };
   }
 
   async deleteConversation(userId: string, conversationId: string) {
