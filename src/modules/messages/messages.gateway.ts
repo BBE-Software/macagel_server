@@ -13,6 +13,7 @@ import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { JwtService } from '@nestjs/jwt';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -40,6 +41,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private messagesService: MessagesService,
     private jwtService: JwtService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
