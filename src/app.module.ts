@@ -9,6 +9,12 @@ import { FriendsModule } from './modules/friends/friends.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MatchLobbyModule } from './modules/match-lobby/match-lobby.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+<<<<<<< Updated upstream
+=======
+import { TeamsModule } from './modules/teams/teams.module';
+import { TeamMatchesModule } from './modules/team-matches/team-matches.module';
+import { KeysModule } from './modules/keys/keys.module';
+>>>>>>> Stashed changes
 
 @Module({
   imports: [
@@ -21,7 +27,14 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     MessagesModule, 
     FriendsModule, 
     MatchLobbyModule, 
+<<<<<<< Updated upstream
     NotificationsModule
+=======
+    NotificationsModule,
+    TeamsModule,
+    TeamMatchesModule,
+    KeysModule
+>>>>>>> Stashed changes
   ],
 })
 export class AppModule {}

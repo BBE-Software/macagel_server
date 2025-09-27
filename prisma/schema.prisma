@@ -82,6 +82,16 @@ model User {
   sentNotifications     Notification[] @relation("SentNotifications")
   receivedNotifications Notification[] @relation("ReceivedNotifications")
 
+<<<<<<< Updated upstream
+=======
+  // Team relationships
+  createdTeams          Team[]         @relation("CreatedTeams")
+  teamMembers           TeamMember[]   @relation("TeamMembers")
+
+  // Device relationships
+  devices               Device[]       @relation("UserDevices")
+
+>>>>>>> Stashed changes
   @@map("users")
 }
 
@@ -236,3 +246,130 @@ model Notification {
 
   @@map("notifications")
 }
+<<<<<<< Updated upstream
+=======
+
+// teams - Takımlar
+model Team {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(100) // Takım adı
+  description     String?  @db.Text // Takım açıklaması
+  city            String   @db.VarChar(100) // Şehir
+  level           String   @db.VarChar(50) // Seviye (amateur, semi-pro, professional)
+  max_players     Int      @default(22) // Maksimum oyuncu sayısı
+  current_players Int      @default(0) // Mevcut oyuncu sayısı
+  logo_url        String?  @db.VarChar(255) // Takım logosu
+  is_active       Boolean  @default(true) // Aktif mi
+  creator_id      String   @db.Uuid // Takımı oluşturan kullanıcı
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  creator      User         @relation("CreatedTeams", fields: [creator_id], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+  homeMatches  TeamMatch[]  @relation("HomeTeamMatches")
+  awayMatches  TeamMatch[]  @relation("AwayTeamMatches")
+
+  @@map("teams")
+}
+
+// team_members - Takım üyeleri
+model TeamMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  team_id    String   @db.Uuid
+  user_id    String   @db.Uuid
+  position   String?  @db.VarChar(50) // Oyuncu pozisyonu
+  role       String   @default("member") @db.VarChar(20) // member, captain, coach
+  joined_at  DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user User @relation("TeamMembers", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([team_id, user_id])
+  @@map("team_members")
+}
+
+// team_matches - Takım maçları
+model TeamMatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  title           String   @db.VarChar(255) // Maç başlığı
+  description     String?  @db.Text // Maç açıklaması
+  location        String   @db.VarChar(255) // Konum
+  latitude        Float? // Enlem
+  longitude       Float? // Boylam
+  date            DateTime // Maç tarihi
+  duration        Int      @default(90) // Süre (dakika)
+  match_type      String   @db.VarChar(20) // 5v5, 7v7, 11v11
+  price_per_person Float?  // Kişi başı ücret
+  home_team_id    String   @db.Uuid // Ev sahibi takım
+  away_team_id    String?  @db.Uuid // Deplasman takımı (null ise rakip aranıyor)
+  status          String   @default("open") @db.VarChar(20) // open, matched, confirmed, started, finished, cancelled
+  creator_id      String   @db.Uuid // Maçı oluşturan kullanıcı
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  creator   User      @relation("CreatedTeamMatches", fields: [creator_id], references: [id], onDelete: Cascade)
+  homeTeam  Team      @relation("HomeTeamMatches", fields: [home_team_id], references: [id], onDelete: Cascade)
+  awayTeam  Team?     @relation("AwayTeamMatches", fields: [away_team_id], references: [id], onDelete: Cascade)
+
+  @@map("team_matches")
+}
+
+// devices - Cihazlar ve anahtar yönetimi
+model Device {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String   @db.Uuid
+  device_id        String   @unique
+  device_name      String?  @db.VarChar(255)
+  device_type      String   @db.VarChar(50)
+  identity_pub_key String   @db.VarChar(100)
+  identity_algo    String   @default("ed25519") @db.VarChar(32)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  
+  user User @relation("UserDevices", fields: [user_id], references: [id], onDelete: Cascade)
+  signedPrekeys SignedPrekey[]
+  oneTimePrekeys OneTimePrekey[]
+  
+  @@map("devices")
+}
+
+// signed_prekeys - İmzalı ön anahtarlar
+model SignedPrekey {
+  id           String   @id @default(uuid()) @db.Uuid
+  device_id    String   @db.Uuid
+  key_id       String   @db.VarChar(64)
+  public_key   String   @db.VarChar(100)
+  signature    String   @db.VarChar(200)
+  algo         String   @default("x25519") @db.VarChar(32)
+  sig_algo     String   @default("ed25519") @db.VarChar(32)
+  valid_from   DateTime @default(now())
+  valid_until  DateTime
+  is_current   Boolean  @default(true)
+  created_at   DateTime @default(now())
+  
+  device Device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  
+  @@unique([device_id, key_id])
+  @@index([device_id, is_current])
+  @@map("signed_prekeys")
+}
+
+// one_time_prekeys - Tek kullanımlık ön anahtarlar
+model OneTimePrekey {
+  id           String    @id @default(uuid()) @db.Uuid
+  device_id    String    @db.Uuid
+  key_id       String    @db.VarChar(64)
+  public_key   String    @db.VarChar(100)
+  algo         String    @default("x25519") @db.VarChar(32)
+  used         Boolean   @default(false)
+  consumed_at  DateTime?
+  created_at   DateTime @default(now())
+  
+  device Device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  
+  @@unique([device_id, key_id])
+  @@index([device_id, used, created_at])
+  @@map("one_time_prekeys")
+}
+>>>>>>> Stashed changes
