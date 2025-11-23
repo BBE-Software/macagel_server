@@ -13,6 +13,7 @@ import {
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
+import { EnqueueMessageDto } from './dto/enqueue-message.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @Controller('messages')
@@ -60,5 +61,13 @@ export class MessagesController {
     @Param('conversationId') conversationId: string,
   ) {
     return this.messagesService.deleteConversation(req.user.id, conversationId);
+  }
+
+  @Post('enqueue')
+  async enqueueMessage(
+    @Request() req: any,
+    @Body() enqueueDto: EnqueueMessageDto,
+  ) {
+    return this.messagesService.enqueueMessage(req.user.id, enqueueDto);
   }
 }

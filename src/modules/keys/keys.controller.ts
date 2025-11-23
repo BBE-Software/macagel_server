@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { KeysService } from './keys.service';
 import { BootstrapKeysDto } from './dto/bootstrap-keys.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -17,5 +17,15 @@ export class KeysController {
   @Get('status')
   async getKeysStatus(@Request() req) {
     return await this.keysService.getKeysStatus(req.user.id);
+  }
+
+  @Get('bundle')
+  async getKeyBundle(
+    @Request() req,
+    @Query('userId') userId: string,
+    @Query('nickname') nickname?: string,
+    @Query('deviceId') deviceId?: string,
+  ) {
+    return await this.keysService.getKeyBundle(userId, deviceId, nickname);
   }
 }

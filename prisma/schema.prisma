@@ -82,16 +82,18 @@ model User {
   sentNotifications     Notification[] @relation("SentNotifications")
   receivedNotifications Notification[] @relation("ReceivedNotifications")
 
-<<<<<<< Updated upstream
-=======
   // Team relationships
   createdTeams          Team[]         @relation("CreatedTeams")
   teamMembers           TeamMember[]   @relation("TeamMembers")
+  createdTeamMatches    TeamMatch[]    @relation("CreatedTeamMatches")
 
   // Device relationships
   devices               Device[]       @relation("UserDevices")
+  
+  // E2EE Message Envelopes
+  sentEnvelopes         MessageEnvelope[] @relation("EnvelopeSender")
+  receivedEnvelopes     MessageEnvelope[] @relation("EnvelopeRecipient")
 
->>>>>>> Stashed changes
   @@map("users")
 }
 
@@ -246,8 +248,6 @@ model Notification {
 
   @@map("notifications")
 }
-<<<<<<< Updated upstream
-=======
 
 // teams - Takımlar
 model Team {
@@ -330,6 +330,7 @@ model Device {
   user User @relation("UserDevices", fields: [user_id], references: [id], onDelete: Cascade)
   signedPrekeys SignedPrekey[]
   oneTimePrekeys OneTimePrekey[]
+  envelopes MessageEnvelope[]
   
   @@map("devices")
 }
@@ -372,4 +373,25 @@ model OneTimePrekey {
   @@index([device_id, used, created_at])
   @@map("one_time_prekeys")
 }
->>>>>>> Stashed changes
+
+// Message Envelopes for E2EE (X3DH Phase 2)
+model MessageEnvelope {
+  id                   String    @id @default(uuid()) @db.Uuid
+  conversation_id      String    @db.VarChar(255)
+  sender_user_id       String    @db.Uuid
+  recipient_user_id    String    @db.Uuid
+  recipient_device_id  String    @db.Uuid
+  header_json          Json
+  ciphertext_b64       String    @db.Text
+  created_at           DateTime  @default(now())
+  status               String    @default("pending") @db.VarChar(32)
+  delivered_at         DateTime?
+  
+  sender     User   @relation("EnvelopeSender", fields: [sender_user_id], references: [id], onDelete: Cascade)
+  recipient  User   @relation("EnvelopeRecipient", fields: [recipient_user_id], references: [id], onDelete: Cascade)
+  device     Device @relation(fields: [recipient_device_id], references: [id], onDelete: Cascade)
+  
+  @@index([recipient_user_id, recipient_device_id, created_at])
+  @@index([conversation_id, created_at])
+  @@map("message_envelopes")
+}

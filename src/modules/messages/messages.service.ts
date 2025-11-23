@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
+import { EnqueueMessageDto } from './dto/enqueue-message.dto';
 import { encryptMessageContent, decryptMessageContent } from '../../utils/crypto.util';
 
 @Injectable()
@@ -325,5 +326,139 @@ export class MessagesService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Enqueue encrypted message envelopes for X3DH first messages
+   * Server never parses ciphertext - just stores opaque blobs
+   */
+  async enqueueMessage(senderId: string, enqueueDto: EnqueueMessageDto) {
+    console.log('📬 Enqueuing message from:', senderId);
+    console.log('   📌 Step 1 - Conversation ID:', enqueueDto.conversationId);
+    console.log('   📌 Step 2 - Recipient User ID:', enqueueDto.recipientUserId);
+    console.log('   📌 Step 3 - Fanout count:', enqueueDto.fanout.length);
+
+    // Resolve recipient ID: prefer provided UUID, else resolve by nickname
+    let recipientUserId = enqueueDto.recipientUserId;
+    if (!recipientUserId && enqueueDto.recipientNickname) {
+      const u = await this.prisma.user.findUnique({
+        where: { nickname: enqueueDto.recipientNickname },
+        select: { id: true },
+      });
+      if (!u) {
+        throw new NotFoundException('Invalid recipientNickname: user not found');
+      }
+      recipientUserId = u.id;
+    }
+    if (!recipientUserId) {
+      throw new BadRequestException('recipientUserId or recipientNickname is required');
+    }
+
+    // Find or create conversation if not supplied
+    let conversationId = enqueueDto.conversationId;
+    if (!conversationId) {
+      console.log('   📌 Step 0 - No conversationId, resolving 1:1 thread...');
+      // Try to find existing 1:1 conversation between sender and recipient
+      const existing = await this.prisma.conversation.findFirst({
+        where: {
+          OR: [
+            { user1_id: senderId, user2_id: recipientUserId },
+            { user1_id: recipientUserId, user2_id: senderId },
+          ],
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        conversationId = existing.id;
+      } else {
+        const conv = await this.prisma.conversation.create({
+          data: { user1_id: senderId, user2_id: recipientUserId },
+          select: { id: true },
+        });
+        conversationId = conv.id;
+        console.log('   🆕 Created new conversation:', conversationId);
+      }
+    } else {
+      // Validate provided conversation exists
+      const conversation = await this.prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { id: true },
+      });
+      if (!conversation) {
+        throw new BadRequestException('Invalid conversationId: conversation not found');
+      }
+    }
+
+    // Validate recipient exists
+    const recipient = await this.prisma.user.findUnique({
+      where: { id: recipientUserId },
+    });
+
+    if (!recipient) {
+      throw new NotFoundException('Invalid recipientUserId: user not found');
+    }
+
+    // Validate each envelope
+    const MAX_CIPHERTEXT_SIZE = 65536; // 64 KB
+    for (const envelope of enqueueDto.fanout) {
+      // Validate ciphertext size
+      const ciphertextBytes = Buffer.from(envelope.ciphertext, 'base64').length;
+      if (ciphertextBytes > MAX_CIPHERTEXT_SIZE) {
+        throw new BadRequestException(
+          `Ciphertext exceeds 64KB limit for device ${envelope.recipientDeviceId}`,
+        );
+      }
+
+      // Validate header version
+      if (envelope.header.v !== 1) {
+        throw new BadRequestException('Invalid header version (must be 1)');
+      }
+
+      // Validate device exists
+      const device = await this.prisma.device.findFirst({
+        where: {
+          device_id: envelope.recipientDeviceId,
+          user_id: recipientUserId,
+        },
+      });
+
+      if (!device) {
+        throw new NotFoundException(
+          `Invalid recipientDeviceId: ${envelope.recipientDeviceId} not found for recipient`,
+        );
+      }
+    }
+
+    // Insert envelopes (one per device)
+    const inserted = await Promise.all(
+      enqueueDto.fanout.map(async (envelope) => {
+        // Get device UUID
+        const device = await this.prisma.device.findFirst({
+          where: {
+            device_id: envelope.recipientDeviceId,
+            user_id: recipientUserId,
+          },
+        });
+
+        return this.prisma.messageEnvelope.create({
+          data: {
+            conversation_id: conversationId!,
+            sender_user_id: senderId,
+            recipient_user_id: recipientUserId!,
+            recipient_device_id: device!.id,
+            header_json: envelope.header as any,
+            ciphertext_b64: envelope.ciphertext,
+            status: 'pending',
+          },
+        });
+      }),
+    );
+
+    console.log('✅ Enqueued', inserted.length, 'envelope(s)');
+
+    return {
+      accepted: true,
+      enqueued: inserted.length,
+    };
   }
 }
