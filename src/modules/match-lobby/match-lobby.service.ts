@@ -105,6 +105,7 @@ export class MatchLobbyService {
         location: createLobbyDto.location,
         latitude: createLobbyDto.latitude,
         longitude: createLobbyDto.longitude,
+        venue_id: createLobbyDto.venue_id, // YENİ: Halısaha ID'si
         date: turkeyDate, // Türkiye saati olarak kaydet
         duration: createLobbyDto.duration || 90,
         max_players: createLobbyDto.max_players || 22,
@@ -496,4 +497,265 @@ export class MatchLobbyService {
     console.log('✅ Lobi başarıyla silindi');
     return { message: 'Lobi başarıyla silindi' };
   }
+
+  // ======= YENİ: Katılım İsteği Sistemi =======
+
+  /**
+   * Maça katılım isteği oluştur
+   */
+  async createJoinRequest(
+    lobbyId: string,
+    userId: string,
+    message?: string,
+    venueId?: string,
+  ) {
+    console.log('📨 Katılım isteği oluşturuluyor...', { lobbyId, userId });
+
+    // Lobi kontrolü
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: lobbyId },
+      include: { creator: true },
+    });
+
+    if (!lobby) {
+      throw new NotFoundException('Maç lobisi bulunamadı');
+    }
+
+    // Maç sahibi kendi maçına istek atamaz
+    if (lobby.creator_id === userId) {
+      throw new BadRequestException('Kendi oluşturduğunuz maça katılım isteği gönderemezsiniz');
+    }
+
+    // Zaten katılmış mı kontrol et
+    const alreadyJoined = await this.prisma.matchParticipant.findUnique({
+      where: {
+        lobby_id_user_id: {
+          lobby_id: lobbyId,
+          user_id: userId,
+        },
+      },
+    });
+
+    if (alreadyJoined) {
+      throw new BadRequestException('Bu maça zaten katıldınız');
+    }
+
+    // Zaten bekleyen istek var mı kontrol et
+    const existingRequest = await this.prisma.matchJoinRequest.findUnique({
+      where: {
+        lobby_id_user_id: {
+          lobby_id: lobbyId,
+          user_id: userId,
+        },
+      },
+    });
+
+    if (existingRequest) {
+      if (existingRequest.status === 'pending') {
+        throw new BadRequestException('Bu maça zaten katılım isteğiniz bulunmaktadır');
+      } else if (existingRequest.status === 'rejected') {
+        // Reddedilmiş isteği güncelle
+        const request = await this.prisma.matchJoinRequest.update({
+          where: { id: existingRequest.id },
+          data: {
+            status: 'pending',
+            message,
+            venue_id: venueId,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                surname: true,
+                nickname: true,
+              },
+            },
+          },
+        });
+
+        console.log('✅ Katılım isteği yeniden gönderildi');
+        return { message: 'Katılım isteği gönderildi', data: request };
+      }
+    }
+
+    // Yeni istek oluştur
+    const request = await this.prisma.matchJoinRequest.create({
+      data: {
+        lobby_id: lobbyId,
+        user_id: userId,
+        venue_id: venueId,
+        message,
+        status: 'pending',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            surname: true,
+            nickname: true,
+          },
+        },
+      },
+    });
+
+    // TODO: Maç sahibine bildirim gönder
+    // await this.notificationsService.create({...})
+
+    console.log('✅ Katılım isteği oluşturuldu');
+    return { message: 'Katılım isteği gönderildi', data: request };
+  }
+
+  /**
+   * Maçın katılım isteklerini getir (sadece maç sahibi)
+   */
+  async getJoinRequests(lobbyId: string, userId: string) {
+    console.log('📋 Katılım istekleri getiriliyor...', { lobbyId, userId });
+
+    // Lobi kontrolü
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: lobbyId },
+    });
+
+    if (!lobby) {
+      throw new NotFoundException('Maç lobisi bulunamadı');
+    }
+
+    // Sadece maç sahibi görebilir
+    if (lobby.creator_id !== userId) {
+      throw new ForbiddenException('Bu istekleri görme yetkiniz yok');
+    }
+
+    const requests = await this.prisma.matchJoinRequest.findMany({
+      where: {
+        lobby_id: lobbyId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            surname: true,
+            nickname: true,
+            position: true,
+            preferred_foot: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    return {
+      success: true,
+      count: requests.length,
+      data: requests,
+    };
+  }
+
+  /**
+   * Katılım isteğini onayla
+   */
+  async acceptJoinRequest(requestId: string, userId: string) {
+    console.log('✅ Katılım isteği onaylanıyor...', { requestId, userId });
+
+    // İstek kontrolü
+    const request = await this.prisma.matchJoinRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        lobby: true,
+        user: true,
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Katılım isteği bulunamadı');
+    }
+
+    // Sadece maç sahibi onaylayabilir
+    if (request.lobby.creator_id !== userId) {
+      throw new ForbiddenException('Bu isteği onaylama yetkiniz yok');
+    }
+
+    // Maç dolu mu kontrol et
+    if (request.lobby.current_players >= request.lobby.max_players) {
+      throw new BadRequestException('Maç dolu');
+    }
+
+    // İsteği onayla
+    await this.prisma.matchJoinRequest.update({
+      where: { id: requestId },
+      data: { status: 'accepted' },
+    });
+
+    // Kullanıcıyı maça ekle
+    await this.prisma.matchParticipant.create({
+      data: {
+        lobby_id: request.lobby_id,
+        user_id: request.user_id,
+      },
+    });
+
+    // Lobi oyuncu sayısını güncelle
+    const updatedLobby = await this.prisma.matchLobby.update({
+      where: { id: request.lobby_id },
+      data: {
+        current_players: { increment: 1 },
+      },
+    });
+
+    // Maç doldu mu kontrol et
+    if (updatedLobby.current_players >= updatedLobby.max_players) {
+      await this.prisma.matchLobby.update({
+        where: { id: request.lobby_id },
+        data: { status: 'full' },
+      });
+    }
+
+    // TODO: Kullanıcıya bildirim gönder
+    // await this.notificationsService.create({...})
+
+    console.log('✅ Katılım isteği onaylandı');
+    return { message: 'Katılım isteği onaylandı', data: request };
+  }
+
+  /**
+   * Katılım isteğini reddet
+   */
+  async rejectJoinRequest(requestId: string, userId: string) {
+    console.log('❌ Katılım isteği reddediliyor...', { requestId, userId });
+
+    // İstek kontrolü
+    const request = await this.prisma.matchJoinRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        lobby: true,
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Katılım isteği bulunamadı');
+    }
+
+    // Sadece maç sahibi reddedebilir
+    if (request.lobby.creator_id !== userId) {
+      throw new ForbiddenException('Bu isteği reddetme yetkiniz yok');
+    }
+
+    // İsteği reddet
+    await this.prisma.matchJoinRequest.update({
+      where: { id: requestId },
+      data: { status: 'rejected' },
+    });
+
+    // TODO: Kullanıcıya bildirim gönder
+    // await this.notificationsService.create({...})
+
+    console.log('✅ Katılım isteği reddedildi');
+    return { message: 'Katılım isteği reddedildi' };
+  }
+
+  // ======= YENİ SON =======
 }

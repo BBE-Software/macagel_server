@@ -4,6 +4,7 @@ export class CreateMatchLobbyDto {
   location: string;
   latitude?: number;
   longitude?: number;
+  venue_id?: string; // YENİ: Halısaha ID'si
   date: string; // ISO date string
   duration?: number; // dakika
   max_players?: number;

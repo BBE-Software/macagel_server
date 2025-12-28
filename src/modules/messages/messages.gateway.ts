@@ -12,7 +12,7 @@ import { UseGuards } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { JwtService } from '@nestjs/jwt';
+import { createClient } from '@supabase/supabase-js';
 import { NotificationsService } from '../notifications/notifications.service';
 
 interface AuthenticatedSocket extends Socket {
@@ -37,10 +37,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   server: Server;
 
   private connectedUsers = new Map<string, string>(); // userId -> socketId
+  private supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
 
   constructor(
     private messagesService: MessagesService,
-    private jwtService: JwtService,
     private notificationsService: NotificationsService,
   ) {}
 
@@ -62,46 +65,41 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       console.log('🔑 Token alındı, uzunluk:', token.length);
 
-      // JWT token'ı verify et
+      // JWT token'ı Supabase API ile verify et (HTTP guard ile aynı yöntem)
       try {
-        console.log('🔐 JWT token doğrulanıyor...');
-        const payload = await this.jwtService.verifyAsync(token, {
-          secret: 'temp-secret', // JWT strategy ile aynı secret
-        });
+        console.log('🔐 Supabase ile JWT token doğrulanıyor...');
+        const { data: { user }, error } = await this.supabase.auth.getUser(token);
         
-        console.log('✅ JWT payload:', JSON.stringify(payload, null, 2));
-        
-        const userId = payload.sub || payload.id;
-        if (!userId) {
-          console.log('❌ WebSocket: Token içinde kullanıcı ID bulunamadı');
-          console.log('🔍 Payload:', payload);
+        if (error || !user) {
+          console.log('❌ WebSocket: Supabase token doğrulama hatası:', error?.message);
           client.disconnect();
           return;
         }
 
-        console.log('👤 User ID bulundu:', userId);
+        console.log('✅ WebSocket: Supabase token doğrulandı');
+        console.log('👤 User ID bulundu:', user.id);
 
         // Kullanıcı bilgilerini socket'e ekle
         client.user = {
-          id: userId,
-          email: payload.email,
-          name: payload.name,
-          surname: payload.surname,
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.name || '',
+          surname: user.user_metadata?.surname || '',
         };
 
         // Kullanıcıyı bağlı kullanıcılar listesine ekle
-        this.connectedUsers.set(userId, client.id);
-        client.join(`user:${userId}`);
+        this.connectedUsers.set(user.id, client.id);
+        client.join(`user:${user.id}`);
         
-        console.log(`✅ WebSocket: User ${userId} connected with socket ${client.id}`);
+        console.log(`✅ WebSocket: User ${user.id} connected with socket ${client.id}`);
         
         // Kullanıcıya bağlantı başarılı mesajı gönder
         client.emit('connected', {
           message: 'WebSocket bağlantısı başarılı',
-          userId: userId,
+          userId: user.id,
         });
-      } catch (jwtError) {
-        console.log('❌ WebSocket: JWT doğrulama hatası:', jwtError.message);
+      } catch (authError) {
+        console.log('❌ WebSocket: Token doğrulama hatası:', authError.message);
         client.disconnect();
         return;
       }

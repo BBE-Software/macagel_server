@@ -89,6 +89,15 @@ model User {
   createdTeams          Team[]         @relation("CreatedTeams")
   teamMembers           TeamMember[]   @relation("TeamMembers")
 
+  // Venue relationships (YENİ!)
+  addedVenues           FutsalVenue[]  @relation("AddedVenues")
+  sentJoinRequests      MatchJoinRequest[] @relation("SentJoinRequests")
+
+  @@index([name])
+  @@index([surname])
+  @@index([nickname])
+  @@index([email])
+  @@index([is_active])
   @@map("users")
 }
 
@@ -105,6 +114,9 @@ model Conversation {
   messages Message[]
 
   @@unique([user1_id, user2_id])
+  @@index([user1_id])
+  @@index([user2_id])
+  @@index([updated_at(sort: Desc)])
   @@map("conversations")
 }
 
@@ -124,6 +136,13 @@ model Message {
   sender       User         @relation("SentMessages", fields: [sender_id], references: [id], onDelete: Cascade)
   receiver     User         @relation("ReceivedMessages", fields: [receiver_id], references: [id], onDelete: Cascade)
 
+  @@index([conversation_id])
+  @@index([sender_id])
+  @@index([receiver_id])
+  @@index([created_at(sort: Desc)])
+  @@index([is_read])
+  @@index([conversation_id, is_read, receiver_id])
+  @@index([conversation_id, created_at(sort: Desc)])
   @@map("messages")
 }
 
@@ -141,6 +160,9 @@ model FriendRequest {
   receiver User @relation("ReceivedFriendRequests", fields: [receiver_id], references: [id], onDelete: Cascade)
 
   @@unique([sender_id, receiver_id])
+  @@index([receiver_id, status])
+  @@index([sender_id, status])
+  @@index([created_at(sort: Desc)])
   @@map("friend_requests")
 }
 
@@ -155,6 +177,8 @@ model Friend {
   user2 User @relation("User2Friends", fields: [user2_id], references: [id], onDelete: Cascade)
 
   @@unique([user1_id, user2_id])
+  @@index([user1_id])
+  @@index([user2_id])
   @@map("friends")
 }
 
@@ -166,6 +190,7 @@ model MatchLobby {
   location        String   @db.VarChar(255) // Konum
   latitude        Float? // Enlem
   longitude       Float? // Boylam
+  venue_id        String?  @db.Uuid // Halısaha ID (YENİ!)
   date            DateTime // Maç tarihi
   duration        Int      @default(90) // Süre (dakika)
   max_players     Int      @default(22) // Maksimum oyuncu sayısı
@@ -181,10 +206,13 @@ model MatchLobby {
   updated_at      DateTime @updatedAt
 
   creator      User                @relation("CreatedLobbies", fields: [creator_id], references: [id], onDelete: Cascade)
+  venue        FutsalVenue?        @relation(fields: [venue_id], references: [id], onDelete: SetNull)
   participants MatchParticipant[]
   invitations  MatchInvitation[]
+  join_requests MatchJoinRequest[] // Katılım istekleri (YENİ!)
 
   @@map("match_lobbies")
+  @@index([venue_id, date]) // Halısaha ve tarihe göre sorgular için
 }
 
 // match_participants - Maça katılan oyuncular
@@ -308,4 +336,70 @@ model TeamMatch {
   awayTeam  Team?     @relation("AwayTeamMatches", fields: [away_team_id], references: [id], onDelete: Cascade)
 
   @@map("team_matches")
+}
+
+// futsal_venues - Halısahalar
+model FutsalVenue {
+  id              String   @id @default(uuid()) @db.Uuid
+  
+  // Temel bilgiler
+  name            String   @db.VarChar(255)
+  address         String   @db.Text
+  latitude        Float
+  longitude       Float
+  
+  // Detaylar
+  phone           String?  @db.VarChar(20)
+  rating          Float?   @default(0)
+  osm_id          String?  @unique // OpenStreetMap ID (cache için)
+  
+  // Özellikler
+  fields          Int      @default(1) // Kaç tane saha var
+  indoor          Boolean  @default(false)
+  has_lighting    Boolean  @default(true)
+  has_parking     Boolean  @default(false)
+  has_locker_room Boolean  @default(false)
+  
+  // Fiyatlandırma
+  price_per_hour  Decimal? @db.Decimal(10, 2)
+  
+  // İlişkiler
+  lobbies         MatchLobby[] // Bu halısahadaki maçlar
+  join_requests   MatchJoinRequest[] // Katılım istekleri (venue üzerinden erişim için)
+  
+  // Kullanıcı katkısı
+  added_by_user_id String?  @db.Uuid
+  added_by         User?    @relation("AddedVenues", fields: [added_by_user_id], references: [id], onDelete: SetNull)
+  verified         Boolean  @default(false) // Admin onayı
+  
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  
+  @@map("futsal_venues")
+  @@index([latitude, longitude]) // Konum sorguları için
+  @@index([verified])
+  @@index([osm_id])
+}
+
+// match_join_requests - Maça katılım istekleri
+model MatchJoinRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  lobby_id    String   @db.Uuid
+  user_id     String   @db.Uuid
+  venue_id    String?  @db.Uuid // Opsiyonel: İstek hangi halısaha üzerinden geldi
+  status      String   @default("pending") @db.VarChar(20) // pending, accepted, rejected
+  message     String?  @db.Text // Kullanıcının notu
+  
+  lobby       MatchLobby    @relation(fields: [lobby_id], references: [id], onDelete: Cascade)
+  user        User          @relation("SentJoinRequests", fields: [user_id], references: [id], onDelete: Cascade)
+  venue       FutsalVenue?  @relation(fields: [venue_id], references: [id], onDelete: SetNull)
+  
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  @@unique([lobby_id, user_id]) // Aynı kişi aynı maça birden fazla istek atamaz
+  @@map("match_join_requests")
+  @@index([lobby_id, status])
+  @@index([user_id, status])
+  @@index([venue_id])
 }

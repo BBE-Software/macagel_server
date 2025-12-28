@@ -11,6 +11,7 @@ import { MatchLobbyModule } from './modules/match-lobby/match-lobby.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { TeamMatchesModule } from './modules/team-matches/team-matches.module';
+import { VenuesModule } from './modules/venues/venues.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { TeamMatchesModule } from './modules/team-matches/team-matches.module';
     MatchLobbyModule, 
     NotificationsModule,
     TeamsModule,
-    TeamMatchesModule
+    TeamMatchesModule,
+    VenuesModule
   ],
 })
 export class AppModule {}

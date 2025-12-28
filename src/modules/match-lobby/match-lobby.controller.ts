@@ -61,6 +61,64 @@ export class MatchLobbyController {
     return this.matchLobbyService.joinLobby(lobbyId, req.user.id, joinLobbyDto);
   }
 
+  // ======= YENİ: Katılım İsteği Sistemi =======
+  
+  /**
+   * POST /match-lobby/:id/join-request
+   * Maça katılım isteği gönder
+   */
+  @Post(':id/join-request')
+  async requestToJoin(
+    @Request() req: any,
+    @Param('id') lobbyId: string,
+    @Body() body: { message?: string; venueId?: string },
+  ) {
+    return this.matchLobbyService.createJoinRequest(
+      lobbyId,
+      req.user.id,
+      body.message,
+      body.venueId,
+    );
+  }
+
+  /**
+   * GET /match-lobby/:id/join-requests
+   * Maçın katılım isteklerini getir (sadece maç sahibi)
+   */
+  @Get(':id/join-requests')
+  async getJoinRequests(
+    @Request() req: any,
+    @Param('id') lobbyId: string,
+  ) {
+    return this.matchLobbyService.getJoinRequests(lobbyId, req.user.id);
+  }
+
+  /**
+   * PATCH /match-lobby/join-requests/:requestId/accept
+   * Katılım isteğini onayla (sadece maç sahibi)
+   */
+  @Put('join-requests/:requestId/accept')
+  async acceptJoinRequest(
+    @Request() req: any,
+    @Param('requestId') requestId: string,
+  ) {
+    return this.matchLobbyService.acceptJoinRequest(requestId, req.user.id);
+  }
+
+  /**
+   * PATCH /match-lobby/join-requests/:requestId/reject
+   * Katılım isteğini reddet (sadece maç sahibi)
+   */
+  @Put('join-requests/:requestId/reject')
+  async rejectJoinRequest(
+    @Request() req: any,
+    @Param('requestId') requestId: string,
+  ) {
+    return this.matchLobbyService.rejectJoinRequest(requestId, req.user.id);
+  }
+
+  // ======= YENİ SON =======
+
   // Maç lobisinden ayrıl
   @Delete(':id/leave')
   async leaveLobby(@Request() req: any, @Param('id') lobbyId: string) {
