@@ -13,7 +13,6 @@ import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { JwtService } from '@nestjs/jwt';
-import { NotificationsService } from '../notifications/notifications.service';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -41,7 +40,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private messagesService: MessagesService,
     private jwtService: JwtService,
-    private notificationsService: NotificationsService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -166,18 +164,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Alıcıya mesajı gönder (eğer online ise)
       const receiverSocketId = this.connectedUsers.get(receiverId);
       if (receiverSocketId) {
-        console.log('📤 Alıcıya mesaj gönderiliyor:', receiverId);
         this.server.to(receiverSocketId).emit('new-message', message);
-      } else {
-        console.log('⚠️ Alıcı online değil:', receiverId);
       }
 
-      // Gönderene de mesajı gönder (kendi mesajını görmesi için)
-      console.log('📤 Gönderene mesaj gönderiliyor:', senderId);
-      this.server.to(`user:${senderId}`).emit('new-message', message);
-
       // Her iki kullanıcının konuşma listesini güncelle
-      console.log('🔄 Konuşma listeleri güncelleniyor...');
       this.server.to(`user:${senderId}`).emit('conversation-updated');
       this.server.to(`user:${receiverId}`).emit('conversation-updated');
 
@@ -222,9 +212,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         conversationId,
         readBy: userId,
       });
-
-      // Konuşma listelerini güncelle
-      this.server.to(`user:${userId}`).emit('conversation-updated');
 
     } catch (error) {
       console.error('Join conversation error:', error);

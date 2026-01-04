@@ -1,16 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { RespondNotificationDto } from './dto/respond-notification.dto';
-import { MessagesGateway } from '../messages/messages.gateway';
 
 @Injectable()
 export class NotificationsService {
-  constructor(
-    private prisma: PrismaService,
-    @Inject(forwardRef(() => MessagesGateway))
-    private messagesGateway: MessagesGateway,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   // Bildirim oluştur
   async createNotification(senderId: string, createNotificationDto: CreateNotificationDto) {
@@ -126,22 +121,6 @@ export class NotificationsService {
     });
 
     console.log('✅ Maça katılım isteği gönderildi');
-    
-    // WebSocket ile bildirim gönder
-    try {
-      this.messagesGateway.server.to(`user:${lobby.creator_id}`).emit('match-join-request', {
-        notificationId: notification.id,
-        senderName: `${user.name} ${user.surname}`,
-        senderNickname: user.nickname,
-        lobbyTitle: lobby.title,
-        lobbyId: lobbyId,
-        message: notification.message,
-      });
-      console.log('📱 WebSocket ile maça katılım isteği bildirimi gönderildi');
-    } catch (error) {
-      console.error('❌ WebSocket bildirim hatası:', error);
-    }
-    
     return notification;
   }
 
