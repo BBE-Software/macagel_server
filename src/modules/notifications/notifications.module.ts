@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { PushNotificationService } from './push-notification.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { MessagesModule } from '../messages/messages.module';
 
@@ -10,7 +11,7 @@ import { MessagesModule } from '../messages/messages.module';
     forwardRef(() => MessagesModule),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
-  exports: [NotificationsService],
+  providers: [NotificationsService, PushNotificationService],
+  exports: [NotificationsService, PushNotificationService],
 })
 export class NotificationsModule {}

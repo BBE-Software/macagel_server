@@ -54,6 +54,8 @@ model User {
   is_active         Boolean  @default(true)
   current_latitude  Float?   @db.Real
   current_longitude Float?   @db.Real
+  profile_image_url String?  @db.VarChar(500) // Profil fotoğrafı URL'si
+  fcm_token         String?  @db.VarChar(500) // Firebase Cloud Messaging Token
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
 

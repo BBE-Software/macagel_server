@@ -92,4 +92,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsNumber()
   current_longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  profile_image_url?: string;
 }

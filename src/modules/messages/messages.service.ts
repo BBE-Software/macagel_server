@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
 import { encryptMessageContent, decryptMessageContent } from '../../utils/crypto.util';
+import { PushNotificationService } from '../notifications/push-notification.service';
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => PushNotificationService))
+    private pushNotificationService: PushNotificationService,
+  ) {}
 
   async createMessage(senderId: string, createMessageDto: CreateMessageDto) {
     const { receiverId, content, messageType } = createMessageDto;
@@ -106,6 +111,17 @@ export class MessagesService {
     });
 
     console.log('✅ Mesaj başarıyla oluşturuldu:', message.id);
+    
+    // Push bildirim gönder (async, hatayı yutuyoruz)
+    this.pushNotificationService
+      .sendNewMessageNotification(
+        receiverId,
+        `${sender.name} ${sender.surname}`,
+        content,
+        conversation.id,
+      )
+      .catch((err) => console.error('❌ Push bildirim gönderilemedi:', err));
+    
     // İstemci uyumluluğu için içerik çözülerek döndürülür
     let decrypted: string;
     try {

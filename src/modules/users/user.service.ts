@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
+  private supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getById(id: string) {
@@ -66,5 +72,105 @@ export class UsersService {
     // TODO: Error Exception
 
     return user;
+  }
+
+  async uploadProfileImage(userId: string, file: Express.Multer.File) {
+    // Dosya uzantısını al
+    const extension = file.originalname.split('.').pop() || 'jpg';
+    const fileName = `${userId}/profile.${extension}`;
+
+    // Önce eski fotoğrafı sil (varsa)
+    await this.supabase.storage
+      .from('profile-images')
+      .remove([
+        `${userId}/profile.jpg`,
+        `${userId}/profile.jpeg`,
+        `${userId}/profile.png`,
+        `${userId}/profile.webp`,
+        `${userId}/profile.gif`,
+      ]);
+
+    // Yeni fotoğrafı yükle
+    const { data, error } = await this.supabase.storage
+      .from('profile-images')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Supabase upload hatası:', error);
+      throw new Error('Fotoğraf yüklenirken hata oluştu');
+    }
+
+    // Public URL oluştur
+    const { data: publicUrlData } = this.supabase.storage
+      .from('profile-images')
+      .getPublicUrl(fileName);
+
+    const profileImageUrl = publicUrlData.publicUrl;
+
+    // Kullanıcının profilini güncelle
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profile_image_url: profileImageUrl },
+    });
+
+    return {
+      status: 'success',
+      data: {
+        profile_image_url: profileImageUrl,
+        user: updatedUser,
+      },
+    };
+  }
+
+  async removeProfileImage(userId: string) {
+    // Kullanıcının mevcut profil resmini al
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (user?.profile_image_url) {
+      // Supabase Storage'dan sil
+      await this.supabase.storage
+        .from('profile-images')
+        .remove([
+          `${userId}/profile.jpg`,
+          `${userId}/profile.jpeg`,
+          `${userId}/profile.png`,
+          `${userId}/profile.webp`,
+          `${userId}/profile.gif`,
+        ]);
+    }
+
+    // Kullanıcının profilinden URL'i kaldır
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profile_image_url: null },
+    });
+
+    return {
+      status: 'success',
+      data: {
+        user: updatedUser,
+      },
+      message: 'Profil fotoğrafı kaldırıldı',
+    };
+  }
+
+  async updateFcmToken(userId: string, fcmToken: string | null) {
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { fcm_token: fcmToken },
+    });
+
+    return {
+      status: 'success',
+      data: {
+        user: updatedUser,
+      },
+      message: fcmToken ? 'FCM token kaydedildi' : 'FCM token silindi',
+    };
   }
 }
