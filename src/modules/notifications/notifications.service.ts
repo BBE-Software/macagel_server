@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { RespondNotificationDto } from './dto/respond-notification.dto';
 import { MessagesGateway } from '../messages/messages.gateway';
+import { PushNotificationService } from './push-notification.service';
 
 @Injectable()
 export class NotificationsService {
@@ -10,6 +11,7 @@ export class NotificationsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => MessagesGateway))
     private messagesGateway: MessagesGateway,
+    private pushNotificationService: PushNotificationService,
   ) {}
 
   // Bildirim oluştur
@@ -141,6 +143,17 @@ export class NotificationsService {
     } catch (error) {
       console.error('❌ WebSocket bildirim hatası:', error);
     }
+
+    // Push bildirim gönder (FCM token varsa)
+    this.pushNotificationService
+      .sendMatchJoinRequestNotification(
+        lobby.creator_id,
+        `${user.name} ${user.surname}`,
+        lobby.title,
+        notification.id,
+        lobbyId,
+      )
+      .catch((error) => console.error('❌ Push bildirim hatası:', error));
     
     return notification;
   }
@@ -197,6 +210,15 @@ export class NotificationsService {
       },
     });
 
+    const lobby = await this.prisma.matchLobby.findUnique({
+      where: { id: notification.related_id },
+      select: { title: true, max_players: true, current_players: true },
+    });
+
+    if (!lobby) {
+      throw new BadRequestException('Maç lobisi bulunamadı');
+    }
+
     if (response === 'accepted') {
       // Maça katılımı gerçekleştir
       await this.prisma.matchParticipant.create({
@@ -208,14 +230,6 @@ export class NotificationsService {
       });
 
       // Lobi oyuncu sayısını güncelle
-      const lobby = await this.prisma.matchLobby.findUnique({
-        where: { id: notification.related_id },
-      });
-
-      if (!lobby) {
-        throw new BadRequestException('Maç lobisi bulunamadı');
-      }
-
       await this.prisma.matchLobby.update({
         where: { id: notification.related_id },
         data: {
@@ -280,11 +294,19 @@ export class NotificationsService {
 
       console.log('✅ Hoş geldin mesajı gönderildi');
 
+      this.pushNotificationService
+        .sendMatchJoinAcceptedNotification(notification.sender_id, lobby.title, notification.related_id)
+        .catch((error) => console.error('❌ Push bildirim hatası:', error));
+
       return {
         message: 'Maça katılım isteği onaylandı',
         conversationId: conversation.id,
       };
     } else {
+      this.pushNotificationService
+        .sendMatchJoinRejectedNotification(notification.sender_id, lobby.title)
+        .catch((error) => console.error('❌ Push bildirim hatası:', error));
+
       console.log('❌ Maça katılım isteği reddedildi');
       return { message: 'Maça katılım isteği reddedildi' };
     }
