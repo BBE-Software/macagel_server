@@ -56,6 +56,12 @@ model User {
   current_longitude Float?   @db.Real
   profile_image_url String?  @db.VarChar(500) // Profil fotoğrafı URL'si
   fcm_token         String?  @db.VarChar(500) // Firebase Cloud Messaging Token
+  
+  // Bildirim ayarları
+  notify_matches         Boolean @default(true) // Maç bildirimleri
+  notify_messages        Boolean @default(true) // Mesaj bildirimleri  
+  notify_friend_requests Boolean @default(true) // Arkadaşlık istekleri bildirimleri
+  
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
 

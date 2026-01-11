@@ -137,6 +137,34 @@ export class UsersController {
     return result;
   }
 
+  @Get('me/notification-settings')
+  @HttpCode(200)
+  async getNotificationSettings(@Req() req: RequestWithUser) {
+    const result = await this.usersService.getNotificationSettings(req.user.id);
+    return result;
+  }
+
+  @Patch('me/notification-settings')
+  @HttpCode(200)
+  async updateNotificationSettings(
+    @Req() req: RequestWithUser,
+    @Body() body: {
+      notify_matches?: boolean;
+      notify_messages?: boolean;
+      notify_friend_requests?: boolean;
+    },
+  ) {
+    const result = await this.usersService.updateNotificationSettings(req.user.id, body);
+    return result;
+  }
+
+  @Delete('me/account')
+  @HttpCode(200)
+  async deleteMyAccount(@Req() req: RequestWithUser) {
+    const result = await this.usersService.deleteAccount(req.user.id);
+    return result;
+  }
+
   @Patch('me/deactivate')
   @HttpCode(200)
   async deactivateMe(@Req() req: RequestWithUser) {

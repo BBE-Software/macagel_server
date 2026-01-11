@@ -173,4 +173,86 @@ export class UsersService {
       message: fcmToken ? 'FCM token kaydedildi' : 'FCM token silindi',
     };
   }
+
+  async getNotificationSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        notify_matches: true,
+        notify_messages: true,
+        notify_friend_requests: true,
+      },
+    });
+
+    return {
+      status: 'success',
+      data: user,
+    };
+  }
+
+  async updateNotificationSettings(
+    userId: string,
+    settings: {
+      notify_matches?: boolean;
+      notify_messages?: boolean;
+      notify_friend_requests?: boolean;
+    },
+  ) {
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: settings,
+      select: {
+        notify_matches: true,
+        notify_messages: true,
+        notify_friend_requests: true,
+      },
+    });
+
+    return {
+      status: 'success',
+      data: updatedUser,
+      message: 'Bildirim ayarları güncellendi',
+    };
+  }
+
+  async deleteAccount(userId: string) {
+    // 1. Kullanıcıyı bul
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('Kullanıcı bulunamadı');
+    }
+
+    // 2. Profil fotoğrafını Supabase Storage'dan sil (varsa)
+    if (user.profile_image_url) {
+      await this.supabase.storage
+        .from('profile-images')
+        .remove([
+          `${userId}/profile.jpg`,
+          `${userId}/profile.jpeg`,
+          `${userId}/profile.png`,
+          `${userId}/profile.webp`,
+          `${userId}/profile.gif`,
+        ]);
+    }
+
+    // 3. Supabase Auth'dan kullanıcıyı sil
+    const { error: authError } = await this.supabase.auth.admin.deleteUser(userId);
+    if (authError) {
+      console.error('Supabase auth silme hatası:', authError);
+      // Auth hatası olsa bile devam et, database'den silinmeli
+    }
+
+    // 4. Database'den kullanıcıyı sil (cascade ile ilişkili veriler de silinir)
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return {
+      status: 'success',
+      message: 'Hesap başarıyla silindi',
+    };
+  }
 }

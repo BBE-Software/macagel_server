@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -138,5 +139,42 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    // 1. Kullanıcının email'ini al
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
+
+    // 2. Mevcut şifreyi doğrula (giriş yaparak)
+    const { error: loginError } = await this.supabase.auth.signInWithPassword({
+      email: user.email,
+      password: dto.currentPassword,
+    });
+
+    if (loginError) {
+      throw new BadRequestException('Mevcut şifre hatalı');
+    }
+
+    // 3. Yeni şifreyi güncelle
+    const { error: updateError } = await this.supabase.auth.admin.updateUserById(
+      userId,
+      { password: dto.newPassword }
+    );
+
+    if (updateError) {
+      throw new BadRequestException(`Şifre güncellenemedi: ${updateError.message}`);
+    }
+
+    return {
+      status: 'success',
+      message: 'Şifre başarıyla değiştirildi',
+    };
   }
 }

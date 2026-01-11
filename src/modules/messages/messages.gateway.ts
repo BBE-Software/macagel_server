@@ -28,9 +28,14 @@ interface AuthenticatedSocket extends Socket {
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
+    credentials: true,
   },
   transports: ['polling', 'websocket'], // Polling support ekle
   allowEIO3: true, // Socket.IO v3 uyumluluğu
+  pingTimeout: 60000, // 60 saniye ping timeout
+  pingInterval: 25000, // 25 saniye ping interval
+  allowUpgrades: true,
+  perMessageDeflate: false, // Compression kapalı - daha stabil
 })
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

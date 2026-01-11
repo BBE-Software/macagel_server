@@ -21,9 +21,13 @@ async function bootstrap() {
   // app.setGlobalPrefix('api/v1');
 
   const port = process.env.PORT ?? 3300;
-  await app.listen(port);
-  console.log(`🚀 Server ${port} portunda çalışıyor!`);
-  console.log(`📡 WebSocket: ws://localhost:${port}`);
-  console.log(`🌐 HTTP API: http://localhost:${port}`);
+  const host = process.env.HOST ?? '0.0.0.0'; // Tüm network interface'lerden dinle
+  
+  await app.listen(port, host);
+  
+  console.log(`🚀 Server ${host}:${port} adresinde çalışıyor!`);
+  console.log(`📡 WebSocket: ws://${host}:${port}`);
+  console.log(`🌐 HTTP API: http://${host}:${port}`);
+  console.log(`💡 Dışarıdan erişim için: http://YOUR_SERVER_IP:${port}`);
 }
 bootstrap().catch((err) => console.error(err));
